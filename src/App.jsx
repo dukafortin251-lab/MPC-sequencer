@@ -19,6 +19,22 @@ export default function App() {
   const toggleRec = () => {
     setIsRecording(!isRecording);
   };
+  //La gestion du clavier ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+    const key = e.key.toLowerCase(); // Met la touche en minuscules pour éviter les bugs de majuscules    }
+ // On associe chaque lettre personnalisée à un pad
+      if (key === 'q') ajouterSon("Kick", "/sons/mon-kick-lourd.wav");
+      if (key === 't') ajouterSon("snare", "/sons/caisse-claire-sec.wav");
+      if (key === 'n') ajouterSon("hi-hat", "/sons/hi-hat.wav");
+      if (key === 'p') ajouterSon("percu", "/sons/perc.wav");
+      if (key === 'g') ajouterSon("open-hat", "/sons/open-hat.wav");
+      if (key === 'r') ajouterSon("sample", "/sons/melody.wav");
+    };
+
+    // On écoute l'événement "keydown" sur toute la fenêtre
+window.addEventListener('keydown', handleKeyDown);
+ })
 
   return (
     <div className="mpc-container">
