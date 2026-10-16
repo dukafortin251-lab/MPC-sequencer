@@ -1,73 +1,168 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Pad from './components/Pad.jsx';
 import './App.css';
 
+// --- CONFIGURATION PAR DÉFAUT DES PADS ---
+const initialPads = [
+  { id: 'pad1', nom: 'Kick', touche: 'q', fichierAudio: '/sons/mon-kick-lourd.wav' },
+  { id: 'pad2', nom: 'Snare', touche: 't', fichierAudio: '/sons/caisse-claire-sec.wav' },
+  { id: 'pad3', nom: 'Hi-hat', touche: 'n', fichierAudio: '/sons/hi-hat.wav' },
+  { id: 'pad4', nom: 'Open Hat', touche: 'g', fichierAudio: '/sons/open-hat.wav' },
+  { id: 'pad5', nom: 'Perc', touche: 'p', fichierAudio: '/sons/perc.wav' },
+  { id: 'pad6', nom: 'Bass 808', touche: 'b', fichierAudio: '/sons/808.wav' },
+  { id: 'pad7', nom: 'FX', touche: 'v', fichierAudio: '/sons/fx.wav' },
+  { id: 'pad8', nom: 'Sample', touche: 'r', fichierAudio: '/sons/melody.wav' },
+  { id: 'pad9', nom: 'Pad 9', touche: 'a', fichierAudio: '' },
+  { id: 'pad10', nom: 'Pad 10', touche: 'z', fichierAudio: '' },
+  { id: 'pad11', nom: 'Pad 11', touche: 'e', fichierAudio: '' },
+  { id: 'pad12', nom: 'Pad 12', touche: 'u', fichierAudio: '' },
+  { id: 'pad13', nom: 'Pad 13', touche: 'i', fichierAudio: '' },
+  { id: 'pad14', nom: 'Pad 14', touche: 'o', fichierAudio: '' },
+  { id: 'pad15', nom: 'Pad 15', touche: 'k', fichierAudio: '' },
+  { id: 'pad16', nom: 'Pad 16', touche: 'l', fichierAudio: '' },
+];
+
 export default function App() {
+  const [pads, setPads] = useState(initialPads); // NOUVEAU: Les pads sont en mémoire !
   const [sequence, setSequence] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [activePadId, setActivePadId] = useState(null);
 
-  const ajouterSon = (nom, fichier) => {
+  const isRecordingRef = useRef(false);
+  const startTimeRef = useRef(0);
+  const timersRef = useRef([]);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  // --- CHANGER LE SON D'UN PAD (Quand on glisse un fichier) ---
+  const modifierPad = (padId, file) => {
+    const newAudioUrl = URL.createObjectURL(file); // Crée un lien virtuel vers ton fichier local
+    const shortName = file.name.substring(0, 10); // Raccourcit le nom du fichier
+
+    // Met à jour la liste des pads avec le nouveau son
+    setPads(prevPads => prevPads.map(pad => 
+      pad.id === padId ? { ...pad, nom: shortName, fichierAudio: newAudioUrl } : pad
+    ));
+  };
+
+  const ajouterSon = (nom, fichier, id) => {
+    if (!fichier) return; 
+
     const audio = new Audio(fichier);
     audio.play().catch((e) => console.log("Erreur audio", e));
 
-    if (isRecording) {
-      setSequence((prevSequence) => [...prevSequence, nom]);
+    if (id) {
+      setActivePadId(id);
+      setTimeout(() => setActivePadId(null), 150);
+    }
+
+    if (isRecordingRef.current) {
+      const timeElapsed = Date.now() - startTimeRef.current;
+      setSequence((prev) => [...prev, { nom, fichier, id, time: timeElapsed }]);
     }
   };
 
-  // Fonction pour allumer/éteindre le mode REC
+  // ... (Garde toggleRec, playSequence, stopSequence exactement comme avant) ...
   const toggleRec = () => {
-    setIsRecording(!isRecording);
+    if (!isRecording) {
+      setIsPlaying(false);
+      timersRef.current.forEach(timer => clearTimeout(timer));
+      timersRef.current = [];
+      setSequence([]); 
+      startTimeRef.current = Date.now(); 
+      setIsRecording(true); 
+    } else {
+      setIsRecording(false); 
+    }
   };
-  //La gestion du clavier ---
+
+  const playSequence = () => {
+    if (sequence.length === 0 || isPlaying) return;
+    setIsPlaying(true);
+    setIsRecording(false);
+
+    sequence.forEach((note) => {
+      const timer = setTimeout(() => {
+        const audio = new Audio(note.fichier);
+        audio.play().catch(e => console.log("Erreur", e));
+        if (note.id) {
+           setActivePadId(note.id);
+           setTimeout(() => setActivePadId(null), 150);
+        }
+      }, note.time);
+      timersRef.current.push(timer);
+    });
+
+    if (sequence.length > 0) {
+      const maxTime = Math.max(...sequence.map(n => n.time));
+      const endTimer = setTimeout(() => {
+        setIsPlaying(false);
+        timersRef.current = [];
+      }, maxTime + 300);
+      timersRef.current.push(endTimer);
+    }
+  };
+
+  const stopSequence = () => {
+    setIsPlaying(false);
+    setIsRecording(false);
+    timersRef.current.forEach((timer) => clearTimeout(timer));
+    timersRef.current = [];
+  };
+
+  // --- NOUVELLE GESTION DU CLAVIER (Dynamique) ---
   useEffect(() => {
     const handleKeyDown = (e) => {
-    const key = e.key.toLowerCase(); // Met la touche en minuscules pour éviter les bugs de majuscules    }
- // On associe chaque lettre personnalisée à un pad
-      if (key === 'q') ajouterSon("Kick", "/sons/mon-kick-lourd.wav");
-      if (key === 't') ajouterSon("snare", "/sons/caisse-claire-sec.wav");
-      if (key === 'n') ajouterSon("hi-hat", "/sons/hi-hat.wav");
-      if (key === 'p') ajouterSon("percu", "/sons/perc.wav");
-      if (key === 'g') ajouterSon("open-hat", "/sons/open-hat.wav");
-      if (key === 'r') ajouterSon("sample", "/sons/melody.wav");
+      const key = e.key.toLowerCase();
+      // On cherche dans le tableau "pads" si la touche correspond à un Pad
+      const padTrouve = pads.find(p => p.touche === key);
+      if (padTrouve) {
+        ajouterSon(padTrouve.nom, padTrouve.fichierAudio, padTrouve.id);
+      }
     };
 
-    // On écoute l'événement "keydown" sur toute la fenêtre
-window.addEventListener('keydown', handleKeyDown);
- })
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pads]); // Important: se met à jour quand on modifie un son
 
   return (
     <div className="mpc-container">
       <h1>Mon Mini MPC</h1>
 
-      {/* 1. L'écran LCD */}
       <div className="mpc-screen">
         <div className="screen-status">
           {isRecording && <span className="rec-indicator">● REC</span>}
+          {isPlaying && <span style={{color: '#2eb82e', fontWeight: 'bold'}}>▶ PLAY</span>}
         </div>
-        <p>Séquence : {sequence.length > 0 ? sequence.join(" - ") : "Appuie sur un pad..."}</p>
+        <p>Séquence : {sequence.length > 0 ? sequence.map(s => s.nom).join(" - ") : "Appuie sur un pad..."}</p>
       </div>
 
-      {/* 2. La barre de contrôle avec le bouton REC */}
       <div className="mpc-controls-bar">
-        <button 
-          className={`ctrl-btn ${isRecording ? 'active-rec' : ''}`} 
-          onClick={toggleRec}
-        >
-          REC
-        </button>
+        <button className="ctrl-btn" onClick={stopSequence}>■ STOP</button>
+        <button className={`ctrl-btn ${isPlaying ? 'active-play' : ''}`} onClick={playSequence}>▶ PLAY</button>
+        <button className={`ctrl-btn ${isRecording ? 'active-rec' : ''}`} onClick={toggleRec}>● REC</button>
       </div>
 
-      {/* La grille des Pads */}
       <div className="pads-grid">
-        <Pad nom="Kick" fichierAudio="/sons/mon-kick-lourd.wav" jouerSon={ajouterSon} />
-        <Pad nom="Snare" fichierAudio="/sons/caisse-claire-sec.wav" jouerSon={ajouterSon} />
-        <Pad nom="Hi-hat" fichierAudio="/sons/hi-hat.wav" jouerSon={ajouterSon} />
-        <Pad nom="Open Hat" fichierAudio="/sons/open-hat.wav" jouerSon={ajouterSon} />
-        <Pad nom="Perc" fichierAudio="/sons/perc.wav" jouerSon={ajouterSon} />
-        <Pad nom="Bass 808" fichierAudio="/sons/808.wav" jouerSon={ajouterSon} />
-        <Pad nom="FX" fichierAudio="/sons/fx.wav" jouerSon={ajouterSon} />
-        </div>
+        {/* NOUVEAU : On utilise .map() pour générer automatiquement les 16 pads */}
+        {pads.map((pad) => (
+          <Pad 
+            key={pad.id} 
+            id={pad.id} 
+            nom={pad.nom} 
+            touche={pad.touche}
+            fichierAudio={pad.fichierAudio} 
+            jouerSon={ajouterSon} 
+            estActif={activePadId === pad.id}
+            onFileUpdate={modifierPad} 
+          />
+        ))}
+      </div>
+      
+      <div className="mpc-palm-rest"></div>
     </div>
   );
 }
